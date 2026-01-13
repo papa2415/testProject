@@ -2,11 +2,17 @@ import { useState } from "react";
 import reactLogo from "./assets/react.svg";
 import viteLogo from "/vite.svg";
 import "./App.css";
+import BlogIndex from "./pages/blogindex";
+import Blog from "./pages/blog";
 
 function App() {
-  const [count, setCount] = useState(0);
-
+ const [page, setPage] = useState("blogindex");
   return (
+   <> 
+    <button onClick={() => setPage("blogindex")}>Blog首頁</button>
+      <button onClick={() => setPage("blog")}>Blog</button>
+      {page === "blogindex" && < BlogIndex />}
+      {page === "blog" && <Blog />}
     <div className="container bg-primary">
       <div className="row p-4">
         <div className="col-md-4">
@@ -62,6 +68,7 @@ function App() {
         </div>
       </div>
     </div>
+    </>
   );
 }
 
