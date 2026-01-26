@@ -1,6 +1,11 @@
 import React, { useState, useEffect, useRef } from "react";
 import axios from "axios";
 
+// --- 📦 改用 npm 引入套件 ---
+import EditorJS from '@editorjs/editorjs';
+import Header from '@editorjs/header';
+import DragDrop from 'editorjs-drag-drop';
+
 // --- 📸 自定義圖片插件 (支援網址與上傳) ---
 class UrlImage {
   static get toolbox() {
@@ -114,40 +119,47 @@ function App() {
   const TAG_OPTIONS = ["新手友善", "澆水技巧", "光線需求", "疑難雜症", "居家搭配"];
 
   const AVATAR_OPTIONS = [
-    {
-      label: "萌芽者",
-      value: "https://images.unsplash.com/photo-1613737693063-a3c03b374aaf?q=80&w=764&auto=format&fit=crop",
-    },
-    {
-      label: "馴綠者",
-      value: "https://images.unsplash.com/photo-1750341005578-210e78d64c1d?q=80&w=387&auto=format&fit=crop",
-    },
-    {
-      label: "植人級",
-      value: "https://plus.unsplash.com/premium_photo-1668780538108-a097b10a918a?q=80&w=387&auto=format&fit=crop",
-    },
+    { label: "頭貼1", value: "https://images.unsplash.com/photo-1613737693063-a3c03b374aaf?q=80&w=764&auto=format&fit=crop" },
+    { label: "頭貼2", value: "https://images.unsplash.com/photo-1750341005578-210e78d64c1d?q=80&w=387&auto=format&fit=crop" },
+    { label: "頭貼3", value: "https://plus.unsplash.com/premium_photo-1668780538108-a097b10a918a?q=80&w=387&auto=format&fit=crop" },
+     { label: "頭貼4", value: "https://images.unsplash.com/photo-1680677780842-fbe98addfe01?q=80&w=764&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D" },
   ];
 
+  // --- 🔄 初始化 Editor.js ---
   useEffect(() => {
     if (!editorRef.current) {
-      editorRef.current = new window.EditorJS({
+      const editor = new EditorJS({
         holder: "editorjs-container",
         placeholder: "在此輸入正文...",
         tools: {
           header: {
-            class: window.Header,
+            class: Header, // 使用 import 進來的 Header
             config: { levels: [3], defaultLevel: 3 },
           },
           image: { class: UrlImage },
         },
         onReady: () => {
-          if (window.DragDrop) new window.DragDrop(editorRef.current);
+          // 初始化拖曳功能
+          new DragDrop(editor);
         },
       });
+      editorRef.current = editor;
     }
+
+    // 清除機制：避免 React StrictMode 或重新渲染導致產生多個編輯器
+    return () => {
+      if (editorRef.current && typeof editorRef.current.destroy === 'function') {
+        editorRef.current.destroy();
+        editorRef.current = null;
+      }
+    };
+  }, []);
+
+  useEffect(() => {
     checkToken();
   }, []);
 
+  // --- 所有功能函數 (保持不變) ---
   const handleLogin = async (e) => {
     e.preventDefault();
     try {
@@ -220,6 +232,7 @@ function App() {
   };
 
   const handleSave = async () => {
+    if (!editorRef.current) return;
     const editorData = await editorRef.current.save();
     const convertedBlocks = editorData.blocks
       .map((block) => {
@@ -232,7 +245,7 @@ function App() {
       })
       .filter((b) => b);
 
-    convertedBlocks.push({ type: "relatedProducts", title: "與植物相遇：", products: relatedProducts });
+    convertedBlocks.push({ type: "relatedProducts", title: "與植物相遇", products: relatedProducts });
     if (comments.length > 0)
       convertedBlocks.push({ type: "commentSection", title: "留言與討論", comments: comments });
 
@@ -285,7 +298,10 @@ function App() {
           if (b.type === "image") return { type: "image", data: { url: b.imageUrl, caption: b.caption } };
           return null;
         }).filter(b => b);
-      editorRef.current.render({ blocks: editorBlocks });
+      
+      if (editorRef.current) {
+        editorRef.current.render({ blocks: editorBlocks });
+      }
       window.scrollTo({ top: 0, behavior: "smooth" });
     } catch (err) {
       alert("讀取失敗");
@@ -298,11 +314,12 @@ function App() {
     setSelectedTags([]);
     setRelatedProducts([]);
     setComments([]);
-    editorRef.current.clear();
+    if (editorRef.current) editorRef.current.clear();
   };
 
   return (
     <div className="container py-5 mx-auto" style={{ maxWidth: "950px" }}>
+      {/* 頂部導航 */}
       <div className="card shadow-sm mb-4 border-0">
         <div className="card-body bg-dark text-white rounded d-flex justify-content-between align-items-center py-2 px-4">
           <h5 className="mb-0 fw-bold">🌿 森活 CMS 管理系統</h5>
@@ -323,6 +340,7 @@ function App() {
 
       <div className={!isLoggedIn ? "opacity-50 pointer-events-none" : ""}>
         <div className="card shadow-sm border-0 p-4 mb-5 bg-white">
+          {/* 表單內容 */}
           <div className="row g-3 mb-4 p-3 bg-light rounded border">
             <div className="col-md-9">
               <label className="small fw-bold">文章標題 *</label>
@@ -366,6 +384,7 @@ function App() {
             </div>
           </div>
 
+          {/* Editor.js 容器 */}
           <div className="mb-4">
             <h6 className="fw-bold mb-3 border-start border-4 border-success ps-2">文章正文編輯區</h6>
             <div id="editorjs-container" className="border rounded bg-white p-3 shadow-sm" style={{ minHeight: "400px" }}></div>
@@ -415,21 +434,16 @@ function App() {
               ))}
             </div>
 
-            {/* 💬 留言板預覽 - 修正自動隨機邏輯 */}
+            {/* 💬 留言板預覽 */}
             <div className="col-md-6">
               <h6 className="fw-bold border-bottom pb-2">💬 留言板預覽</h6>
               <button
                 className="btn btn-xs btn-outline-secondary mb-2"
                 onClick={() => {
-                  // --- ✨ 這裡就是自動指派頭像的邏輯 ✨ ---
                   const randomAvatar = AVATAR_OPTIONS[Math.floor(Math.random() * AVATAR_OPTIONS.length)].value;
                   setComments([
                     ...comments,
-                    {
-                      userName: "",
-                      content: "",
-                      avatarType: randomAvatar, // 自動選一個
-                    },
+                    { userName: "", content: "", avatarType: randomAvatar },
                   ]);
                 }}
               >
@@ -463,7 +477,7 @@ function App() {
             {editId ? (
               <div className="d-flex gap-3">
                 <button className="btn btn-primary btn-lg flex-grow-1 fw-bold shadow py-3" onClick={handleSave}>更新文章</button>
-                <button className="btn btn-outline-danger btn-lg fw-bold shadow py-3 px-5" onClick={() => { if (confirm("確定取消？")) resetForm(); }}>取消編輯</button>
+                <button className="btn btn-outline-danger btn-lg fw-bold shadow py-3 px-5" onClick={() => { if (window.confirm("確定取消？")) resetForm(); }}>取消編輯</button>
               </div>
             ) : (
               <button className="btn btn-success btn-lg w-100 fw-bold shadow py-3" onClick={handleSave}>發布新文章</button>
@@ -483,7 +497,7 @@ function App() {
               <div className="btn-group gap-2">
                 <button className="btn btn-sm btn-outline-primary px-3 rounded-pill" onClick={() => handleEdit(a)}>編輯</button>
                 <button className="btn btn-sm btn-outline-danger px-3 rounded-pill" onClick={() => {
-                  if (confirm("確定刪除？")) axios.delete(`${API_BASE}/api/${API_PATH}/admin/article/${a.id}`).then(fetchArticles);
+                  if (window.confirm("確定刪除？")) axios.delete(`${API_BASE}/api/${API_PATH}/admin/article/${a.id}`).then(fetchArticles);
                 }}>刪除</button>
               </div>
             </div>

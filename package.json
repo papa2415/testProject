@@ -11,8 +11,11 @@
     "deploy": "gh-pages -d dist"
   },
   "dependencies": {
+    "@editorjs/editorjs": "^2.31.1",
+    "@editorjs/header": "^2.8.8",
     "axios": "^1.13.2",
     "bootstrap": "^5.3.8",
+    "editorjs-drag-drop": "^1.1.16",
     "gh-pages": "^6.3.0",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
