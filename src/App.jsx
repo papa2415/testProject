@@ -1,6 +1,11 @@
 import React, { useState, useEffect, useRef } from "react";
 import axios from "axios";
 
+// --- 📦 套件引入 ---
+import EditorJS from "@editorjs/editorjs";
+import Header from "@editorjs/header";
+import DragDrop from "editorjs-drag-drop";
+
 // --- 📸 自定義圖片插件 (支援網址與上傳) ---
 class UrlImage {
   static get toolbox() {
@@ -124,44 +129,64 @@ function App() {
     "疑難雜症",
     "居家搭配",
   ];
+
   const AVATAR_OPTIONS = [
     {
-      label: "萌芽者",
+      label: "頭貼1",
       value:
         "https://images.unsplash.com/photo-1613737693063-a3c03b374aaf?q=80&w=764&auto=format&fit=crop",
     },
     {
-      label: "馴綠者",
+      label: "頭貼2",
       value:
         "https://images.unsplash.com/photo-1750341005578-210e78d64c1d?q=80&w=387&auto=format&fit=crop",
     },
     {
-      label: "植人級",
+      label: "頭貼3",
       value:
         "https://plus.unsplash.com/premium_photo-1668780538108-a097b10a918a?q=80&w=387&auto=format&fit=crop",
     },
+    {
+      label: "頭貼4",
+      value:
+        "https://images.unsplash.com/photo-1680677780842-fbe98addfe01?q=80&w=764&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D",
+    },
   ];
 
+  // --- 🔄 初始化 Editor.js ---
   useEffect(() => {
     if (!editorRef.current) {
-      editorRef.current = new window.EditorJS({
+      const editor = new EditorJS({
         holder: "editorjs-container",
         placeholder: "在此輸入正文... (按 Shift+Enter 可在區塊內換行)",
         tools: {
           header: {
-            class: window.Header,
+            class: Header,
             config: { levels: [3], defaultLevel: 3 },
           },
           image: { class: UrlImage },
         },
         onReady: () => {
-          if (window.DragDrop) new window.DragDrop(editorRef.current);
+          new DragDrop(editor);
         },
       });
+      editorRef.current = editor;
     }
+
     checkToken();
+
+    return () => {
+      if (
+        editorRef.current &&
+        typeof editorRef.current.destroy === "function"
+      ) {
+        editorRef.current.destroy();
+        editorRef.current = null;
+      }
+    };
   }, []);
 
+  // --- API 與 功能函數 ---
   const handleLogin = async (e) => {
     e.preventDefault();
     try {
@@ -193,6 +218,7 @@ function App() {
     fetchArticles();
     fetchAllProducts();
   };
+
   const fetchArticles = async () => {
     try {
       const res = await axios.get(`${API_BASE}/api/${API_PATH}/admin/articles`);
@@ -241,10 +267,12 @@ function App() {
   };
 
   const handleSave = async () => {
+    if (!editorRef.current) return;
     const editorData = await editorRef.current.save();
+
+    // ✨ 修復：處理換行並轉換 Block
     const convertedBlocks = editorData.blocks
       .map((block) => {
-        // ✅ 核心修正：將內文中的 \n 轉換為 <br>
         if (block.type === "paragraph")
           return {
             type: "paragraph",
@@ -271,7 +299,6 @@ function App() {
       title: "與植物相遇的傳送門",
       products: relatedProducts,
     });
-
     if (comments.length > 0)
       convertedBlocks.push({
         type: "commentSection",
@@ -279,13 +306,10 @@ function App() {
         comments: comments,
       });
 
-    // ✅ 核心修正：處理標題斷行 (將 \n 轉為 <br>)
-    const finalTitle = formData.title.replace(/\n/g, "<br>");
-
     const payload = {
       data: {
         ...formData,
-        title: finalTitle,
+        title: formData.title.replace(/\n/g, "<br>"), // 標題也支援換行
         tag: selectedTags,
         create_at: Math.floor(new Date(formData.create_at).getTime() / 1000),
         content: formData.description,
@@ -313,8 +337,9 @@ function App() {
       );
       const d = res.data.article;
       setEditId(d.id);
+
+      // ✨ 修復：將 <br> 轉回 \n 供編輯器顯示
       setFormData({
-        // ✅ 核心修正：讀取時將 <br> 轉回換行符號以便編輯
         title: d.title.replace(/<br\s*\/?>/gi, "\n"),
         description: d.description || "",
         image: d.image,
@@ -322,6 +347,7 @@ function App() {
         isPublic: d.isPublic,
         create_at: new Date(d.create_at * 1000).toISOString().split("T")[0],
       });
+
       setSelectedTags(d.tag || []);
       const blocks = d.contentBlocks || [];
       setRelatedProducts(
@@ -334,7 +360,6 @@ function App() {
       const editorBlocks = blocks
         .filter((b) => ["paragraph", "heading", "image"].includes(b.type))
         .map((b) => {
-          // ✅ 核心修正：讀取時將 <br> 轉回換行符號
           if (b.type === "paragraph")
             return {
               type: "paragraph",
@@ -357,7 +382,9 @@ function App() {
         })
         .filter((b) => b);
 
-      editorRef.current.render({ blocks: editorBlocks });
+      if (editorRef.current) {
+        editorRef.current.render({ blocks: editorBlocks });
+      }
       window.scrollTo({ top: 0, behavior: "smooth" });
     } catch (err) {
       alert("讀取失敗");
@@ -377,16 +404,18 @@ function App() {
     setSelectedTags([]);
     setRelatedProducts([]);
     setComments([]);
-    editorRef.current.clear();
+    if (editorRef.current) editorRef.current.clear();
   };
 
   return (
     <div className="container py-5 mx-auto" style={{ maxWidth: "950px" }}>
-      {/* ✅ 新增 CSS 讓 Editor.js 內部換行可見 */}
+      {/* ✨ CSS 修正：確保換行能顯示出來 */}
       <style>{`
         .ce-paragraph, .ce-header { white-space: pre-wrap !important; }
+        .codex-editor { z-index: 0 !important; }
       `}</style>
 
+      {/* 頂部導航 */}
       <div className="card shadow-sm mb-4 border-0">
         <div className="card-body bg-dark text-white rounded d-flex justify-content-between align-items-center py-2 px-4">
           <h5 className="mb-0 fw-bold">🌿 森活 CMS 管理系統</h5>
@@ -431,9 +460,8 @@ function App() {
         <div className="card shadow-sm border-0 p-4 mb-5 bg-white">
           <div className="row g-3 mb-4 p-3 bg-light rounded border">
             <div className="col-md-9">
-              <label className="small fw-bold">
-                文章標題 (可按 Enter 鍵客製斷行) *
-              </label>
+              <label className="small fw-bold">文章標題 *</label>
+              {/* ✨ 改回 textarea 讓標題也能換行 */}
               <textarea
                 className="form-control shadow-sm"
                 rows="2"
@@ -442,7 +470,6 @@ function App() {
                 onChange={(e) =>
                   setFormData({ ...formData, title: e.target.value })
                 }
-                placeholder="輸入標題"
               />
             </div>
             <div className="col-md-3">
@@ -558,6 +585,7 @@ function App() {
           </div>
 
           <div className="row mb-4">
+            {/* 🛍️ 相關商品區 - 依照你的版本修正 */}
             <div className="col-md-6 border-end">
               <h6 className="fw-bold border-bottom pb-2">🛍️ 相關商品</h6>
               <button
@@ -579,7 +607,7 @@ function App() {
               {relatedProducts.map((p, i) => (
                 <div
                   key={i}
-                  className="p-3 border rounded mb-3 bg-white shadow-sm border-start"
+                  className="p-3 border rounded mb-3 bg-white shadow-sm"
                 >
                   <div className="mb-2">
                     <label className="small text-muted fw-bold">商品名稱</label>
@@ -671,20 +699,21 @@ function App() {
               ))}
             </div>
 
+            {/* 💬 留言板預覽 - 依照你的版本修正 */}
             <div className="col-md-6">
               <h6 className="fw-bold border-bottom pb-2">💬 留言板預覽</h6>
               <button
                 className="btn btn-xs btn-outline-secondary mb-2"
-                onClick={() =>
+                onClick={() => {
+                  const randomAvatar =
+                    AVATAR_OPTIONS[
+                      Math.floor(Math.random() * AVATAR_OPTIONS.length)
+                    ].value;
                   setComments([
                     ...comments,
-                    {
-                      userName: "",
-                      content: "",
-                      avatarType: AVATAR_OPTIONS[0].value,
-                    },
-                  ])
-                }
+                    { userName: "", content: "", avatarType: randomAvatar },
+                  ]);
+                }}
               >
                 + 新增留言
               </button>
@@ -762,7 +791,7 @@ function App() {
                 <button
                   className="btn btn-outline-danger btn-lg fw-bold shadow py-3 px-5"
                   onClick={() => {
-                    if (confirm("確定要取消編輯嗎？")) resetForm();
+                    if (window.confirm("確定取消？")) resetForm();
                   }}
                 >
                   取消編輯
@@ -779,6 +808,7 @@ function App() {
           </div>
         </div>
 
+        {/* 文章清單 */}
         <div className="list-group">
           {articles.map((a) => (
             <div
@@ -805,7 +835,7 @@ function App() {
                 <button
                   className="btn btn-sm btn-outline-danger px-3 rounded-pill"
                   onClick={() => {
-                    if (confirm("確定刪除？"))
+                    if (window.confirm("確定刪除？"))
                       axios
                         .delete(
                           `${API_BASE}/api/${API_PATH}/admin/article/${a.id}`,
