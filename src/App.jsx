@@ -124,23 +124,21 @@ function App() {
     "疑難雜症",
     "居家搭配",
   ];
-
-  // 預設頭像選項
   const AVATAR_OPTIONS = [
     {
       label: "萌芽者",
       value:
-        "https://images.unsplash.com/photo-1613737693063-a3c03b374aaf?q=80&w=764&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D",
+        "https://images.unsplash.com/photo-1613737693063-a3c03b374aaf?q=80&w=764&auto=format&fit=crop",
     },
     {
       label: "馴綠者",
       value:
-        "https://images.unsplash.com/photo-1750341005578-210e78d64c1d?q=80&w=387&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D",
+        "https://images.unsplash.com/photo-1750341005578-210e78d64c1d?q=80&w=387&auto=format&fit=crop",
     },
     {
       label: "植人級",
       value:
-        "https://plus.unsplash.com/premium_photo-1668780538108-a097b10a918a?q=80&w=387&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D",
+        "https://plus.unsplash.com/premium_photo-1668780538108-a097b10a918a?q=80&w=387&auto=format&fit=crop",
     },
   ];
 
@@ -148,7 +146,7 @@ function App() {
     if (!editorRef.current) {
       editorRef.current = new window.EditorJS({
         holder: "editorjs-container",
-        placeholder: "在此輸入正文...",
+        placeholder: "在此輸入正文... (按 Shift+Enter 可在區塊內換行)",
         tools: {
           header: {
             class: window.Header,
@@ -195,7 +193,6 @@ function App() {
     fetchArticles();
     fetchAllProducts();
   };
-
   const fetchArticles = async () => {
     try {
       const res = await axios.get(`${API_BASE}/api/${API_PATH}/admin/articles`);
@@ -247,13 +244,17 @@ function App() {
     const editorData = await editorRef.current.save();
     const convertedBlocks = editorData.blocks
       .map((block) => {
+        // ✅ 核心修正：將內文中的 \n 轉換為 <br>
         if (block.type === "paragraph")
-          return { type: "paragraph", content: block.data.text };
+          return {
+            type: "paragraph",
+            content: block.data.text.replace(/\n/g, "<br>"),
+          };
         if (block.type === "header")
           return {
             type: "heading",
             level: block.data.level,
-            content: block.data.text,
+            content: block.data.text.replace(/\n/g, "<br>"),
           };
         if (block.type === "image")
           return {
@@ -267,9 +268,10 @@ function App() {
 
     convertedBlocks.push({
       type: "relatedProducts",
-      title: "與植物相遇：",
+      title: "與植物相遇的傳送門",
       products: relatedProducts,
     });
+
     if (comments.length > 0)
       convertedBlocks.push({
         type: "commentSection",
@@ -277,12 +279,16 @@ function App() {
         comments: comments,
       });
 
+    // ✅ 核心修正：處理標題斷行 (將 \n 轉為 <br>)
+    const finalTitle = formData.title.replace(/\n/g, "<br>");
+
     const payload = {
       data: {
         ...formData,
+        title: finalTitle,
         tag: selectedTags,
         create_at: Math.floor(new Date(formData.create_at).getTime() / 1000),
-        content: formData.description, // 同步簡介內容
+        content: formData.description,
         contentBlocks: convertedBlocks,
       },
     };
@@ -308,7 +314,8 @@ function App() {
       const d = res.data.article;
       setEditId(d.id);
       setFormData({
-        title: d.title,
+        // ✅ 核心修正：讀取時將 <br> 轉回換行符號以便編輯
+        title: d.title.replace(/<br\s*\/?>/gi, "\n"),
         description: d.description || "",
         image: d.image,
         author: d.author || "森活小編",
@@ -327,19 +334,29 @@ function App() {
       const editorBlocks = blocks
         .filter((b) => ["paragraph", "heading", "image"].includes(b.type))
         .map((b) => {
+          // ✅ 核心修正：讀取時將 <br> 轉回換行符號
           if (b.type === "paragraph")
-            return { type: "paragraph", data: { text: b.content } };
+            return {
+              type: "paragraph",
+              data: { text: b.content.replace(/<br\s*\/?>/gi, "\n") },
+            };
           if (b.type === "heading")
             return {
               type: "header",
-              data: { text: b.content, level: b.level },
+              data: {
+                text: b.content.replace(/<br\s*\/?>/gi, "\n"),
+                level: b.level,
+              },
             };
           if (b.type === "image")
             return {
               type: "image",
               data: { url: b.imageUrl, caption: b.caption },
             };
-        });
+          return null;
+        })
+        .filter((b) => b);
+
       editorRef.current.render({ blocks: editorBlocks });
       window.scrollTo({ top: 0, behavior: "smooth" });
     } catch (err) {
@@ -365,6 +382,11 @@ function App() {
 
   return (
     <div className="container py-5 mx-auto" style={{ maxWidth: "950px" }}>
+      {/* ✅ 新增 CSS 讓 Editor.js 內部換行可見 */}
+      <style>{`
+        .ce-paragraph, .ce-header { white-space: pre-wrap !important; }
+      `}</style>
+
       <div className="card shadow-sm mb-4 border-0">
         <div className="card-body bg-dark text-white rounded d-flex justify-content-between align-items-center py-2 px-4">
           <h5 className="mb-0 fw-bold">🌿 森活 CMS 管理系統</h5>
@@ -409,13 +431,18 @@ function App() {
         <div className="card shadow-sm border-0 p-4 mb-5 bg-white">
           <div className="row g-3 mb-4 p-3 bg-light rounded border">
             <div className="col-md-9">
-              <label className="small fw-bold">文章標題 *</label>
-              <input
+              <label className="small fw-bold">
+                文章標題 (可按 Enter 鍵客製斷行) *
+              </label>
+              <textarea
                 className="form-control shadow-sm"
+                rows="2"
+                style={{ resize: "none" }}
                 value={formData.title}
                 onChange={(e) =>
                   setFormData({ ...formData, title: e.target.value })
                 }
+                placeholder="輸入標題"
               />
             </div>
             <div className="col-md-3">
@@ -429,7 +456,6 @@ function App() {
                 }
               />
             </div>
-
             <div className="col-md-4">
               <label className="small fw-bold">作者名稱 *</label>
               <input
@@ -485,7 +511,6 @@ function App() {
                 <option value="false">草稿</option>
               </select>
             </div>
-
             <div className="col-12">
               <label className="small fw-bold d-block mb-2">文章標籤 *</label>
               <div className="d-flex flex-wrap gap-2">
@@ -507,7 +532,6 @@ function App() {
                 ))}
               </div>
             </div>
-
             <div className="col-12">
               <label className="small fw-bold ">文章簡介</label>
               <textarea
@@ -534,7 +558,6 @@ function App() {
           </div>
 
           <div className="row mb-4">
-            {/* 🛍️ 相關商品區 - 完全保留原欄位 */}
             <div className="col-md-6 border-end">
               <h6 className="fw-bold border-bottom pb-2">🛍️ 相關商品</h6>
               <button
@@ -556,7 +579,7 @@ function App() {
               {relatedProducts.map((p, i) => (
                 <div
                   key={i}
-                  className="p-3 border rounded mb-3 bg-white shadow-sm border-start "
+                  className="p-3 border rounded mb-3 bg-white shadow-sm border-start"
                 >
                   <div className="mb-2">
                     <label className="small text-muted fw-bold">商品名稱</label>
@@ -648,7 +671,6 @@ function App() {
               ))}
             </div>
 
-            {/* 💬 留言板預覽 - 保留頭像選擇 */}
             <div className="col-md-6">
               <h6 className="fw-bold border-bottom pb-2">💬 留言板預覽</h6>
               <button
@@ -740,9 +762,7 @@ function App() {
                 <button
                   className="btn btn-outline-danger btn-lg fw-bold shadow py-3 px-5"
                   onClick={() => {
-                    if (confirm("確定要取消編輯嗎？未儲存的變更將會遺失。")) {
-                      resetForm();
-                    }
+                    if (confirm("確定要取消編輯嗎？")) resetForm();
                   }}
                 >
                   取消編輯
@@ -759,7 +779,6 @@ function App() {
           </div>
         </div>
 
-        {/* 文章清單 */}
         <div className="list-group">
           {articles.map((a) => (
             <div
@@ -767,7 +786,9 @@ function App() {
               className="list-group-item d-flex justify-content-between align-items-center mb-2 rounded border-0 shadow-sm p-3 bg-white"
             >
               <div>
-                <h6 className="mb-0 fw-bold">{a.title}</h6>
+                <h6 className="mb-0 fw-bold">
+                  {a.title.replace(/<br\s*\/?>/gi, " ")}
+                </h6>
                 <p className="text-muted small mb-1">{a.description}</p>
                 <small className="text-secondary">
                   {a.author} ·{" "}
