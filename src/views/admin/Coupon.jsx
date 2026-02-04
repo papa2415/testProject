@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import axios from "axios";
+import * as bootstrap from "bootstrap";
 
 //.env
 const API_BASE = import.meta.env.VITE_API_BASE;
@@ -12,6 +13,7 @@ export default function Coupon() {
     ?.split("=")[1];
 
   const [data, setData] = useState([]);
+  const couponModalRef = useRef(null);
 
   useEffect(() => {
     if (!token) return;
@@ -31,6 +33,10 @@ export default function Coupon() {
       }
     };
     fetchCoupons();
+
+    couponModalRef.current = new bootstrap.Modal("#couponModal", {
+      keyboard: false,
+    });
   }, [token]);
 
   const deleteCoupon = async (id) => {
@@ -75,6 +81,14 @@ export default function Coupon() {
   //   }
   // }
 
+  const openModal = () => {
+    couponModalRef.current.show();
+  };
+
+  const closeModal = () => {
+    couponModalRef.current.hide();
+  };
+
   return (
     <>
       {token ? (
@@ -82,7 +96,13 @@ export default function Coupon() {
           <div className="mt-2">
             <h1 className="text-center mb-5">優惠券列表</h1>
             <div className="d-flex justify-content-end">
-              <button>新增優惠卷</button>
+              <button
+                onClick={() => {
+                  openModal();
+                }}
+              >
+                新增優惠卷
+              </button>
             </div>
             <table className="table">
               <thead>
@@ -133,6 +153,47 @@ export default function Coupon() {
       ) : (
         <h1>請先登入</h1>
       )}
+
+      <div
+        className="modal fade"
+        id="couponModal"
+        tabIndex="-1"
+        aria-labelledby="couponModalLabel"
+        aria-hidden="true"
+        ref={couponModalRef}
+      >
+        <div className="modal-dialog">
+          <div className="modal-content">
+            <div className="modal-header">
+              <h1 className="modal-title fs-5" id="couponModalLabel">
+                Modal title
+              </h1>
+              <button
+                type="button"
+                className="btn-close"
+                data-bs-dismiss="modal"
+                aria-label="Close"
+              ></button>
+            </div>
+            <div className="modal-body">...</div>
+            <div className="modal-footer">
+              <button
+                type="button"
+                className="btn btn-secondary"
+                data-bs-dismiss="modal"
+                onClick={() => {
+                  closeModal();
+                }}
+              >
+                Close
+              </button>
+              <button type="button" className="btn btn-primary">
+                Save changes
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
     </>
   );
 }
