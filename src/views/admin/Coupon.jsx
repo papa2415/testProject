@@ -243,7 +243,9 @@ export default function Coupon() {
           <div className="modal-content border-0">
             <div className="modal-header bg-dark text-white">
               <h5 id="productModalLabel" className="modal-title">
-                <span>新增優惠卷</span>
+                <span>
+                  {modalType === "edit" ? "編輯優惠卷" : "新增優惠卷"}
+                </span>
               </h5>
               <button
                 type="button"
