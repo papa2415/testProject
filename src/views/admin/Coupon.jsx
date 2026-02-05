@@ -8,7 +8,7 @@ const API_PATH = import.meta.env.VITE_API_PATH;
 const INITIAL_MODAL_DATA = {
   title: "",
   is_enabled: 1,
-  percent: 0,
+  percent: "",
   due_date: 0,
   code: "",
 };
@@ -21,7 +21,7 @@ export default function Coupon() {
 
   const [data, setData] = useState([]);
   const couponModalRef = useRef(null);
-  const [modalData, setModalData] = useState({ INITIAL_MODAL_DATA });
+  const [modalData, setModalData] = useState(INITIAL_MODAL_DATA);
   const [modalType, setModalType] = useState("");
   const formatDateForInput = (timestamp) => {
     if (!timestamp) return "";
@@ -40,23 +40,20 @@ export default function Coupon() {
     }));
   };
 
-  useEffect(() => {
+  const fetchCoupons = async () => {
     if (!token) return;
-    const fetchCoupons = async () => {
-      try {
-        const res = await axios.get(
-          `${API_BASE}/api/${API_PATH}/admin/coupons`,
-          {
-            headers: {
-              Authorization: token,
-            },
-          },
-        );
-        setData(res.data.coupons);
-      } catch (error) {
-        alert("token無效或已過期");
-      }
-    };
+    try {
+      const res = await axios.get(`${API_BASE}/api/${API_PATH}/admin/coupons`, {
+        headers: {
+          Authorization: token,
+        },
+      });
+      setData(res.data.coupons);
+    } catch (error) {
+      alert("token無效或已過期");
+    }
+  };
+  useEffect(() => {
     fetchCoupons();
 
     couponModalRef.current = new bootstrap.Modal("#couponModal", {
@@ -88,6 +85,47 @@ export default function Coupon() {
     }
   };
 
+  const updateCoupon = async () => {
+    let method = "post";
+    if (modalType === "edit") {
+      method = "put";
+    }
+    const data = {
+      data: {
+        ...modalData,
+        title: modalData.title.trim(),
+        is_enabled: modalData.is_enabled ? 1 : 0,
+        percent: Number(modalData.percent),
+        due_date: modalData.due_date,
+        code: modalData.code,
+      },
+    };
+    try {
+      let res;
+      if (modalType === "create") {
+        res = await axios.post(
+          `${API_BASE}/api/${API_PATH}/admin/coupon`,
+          data,
+          {
+            headers: { Authorization: token },
+          },
+        );
+      } else {
+        res = await axios.put(
+          `${API_BASE}/api/${API_PATH}/admin/coupon/${modalData.id}`,
+          data,
+          {
+            headers: { Authorization: token },
+          },
+        );
+      }
+
+      fetchCoupons();
+      closeModal();
+    } catch (error) {
+      console.log(error.response?.data || error.message);
+    }
+  };
   // const addCoupon=async()=>{
   //   try {
   //     const data=
@@ -242,7 +280,7 @@ export default function Coupon() {
                     type="number"
                     className="form-control"
                     placeholder="折扣幅度"
-                    value={modalData.percent || 0}
+                    value={modalData.percent}
                     onChange={(e) => {
                       handleModalInputChange(e);
                     }}
@@ -262,7 +300,7 @@ export default function Coupon() {
                   value={
                     modalData.due_date
                       ? formatDateForInput(modalData.due_date)
-                      : 0
+                      : ""
                   }
                   onChange={(e) => {
                     const newTimestamp = Math.floor(
@@ -315,7 +353,13 @@ export default function Coupon() {
               >
                 取消
               </button>
-              <button type="button" className="btn btn-primary">
+              <button
+                type="button"
+                className="btn btn-primary"
+                onClick={() => {
+                  updateCoupon();
+                }}
+              >
                 確認
               </button>
             </div>
