@@ -5,6 +5,13 @@ import * as bootstrap from "bootstrap";
 //.env
 const API_BASE = import.meta.env.VITE_API_BASE;
 const API_PATH = import.meta.env.VITE_API_PATH;
+const INITIAL_MODAL_DATA = {
+  title: "",
+  is_enabled: 1,
+  percent: 0,
+  due_date: 0,
+  code: "",
+};
 
 export default function Coupon() {
   const token = document.cookie
@@ -14,6 +21,24 @@ export default function Coupon() {
 
   const [data, setData] = useState([]);
   const couponModalRef = useRef(null);
+  const [modalData, setModalData] = useState({ INITIAL_MODAL_DATA });
+  const [modalType, setModalType] = useState("");
+  const formatDateForInput = (timestamp) => {
+    if (!timestamp) return "";
+    const date = new Date(timestamp * 1000); // 秒 -> 毫秒
+    const yyyy = date.getFullYear();
+    const mm = String(date.getMonth() + 1).padStart(2, "0");
+    const dd = String(date.getDate()).padStart(2, "0");
+    return `${yyyy}-${mm}-${dd}`;
+  };
+
+  const handleModalInputChange = (e) => {
+    const { name, value, checked, type } = e.target;
+    setModalData((pre) => ({
+      ...pre,
+      [name]: type === "checkbox" ? checked : value,
+    }));
+  };
 
   useEffect(() => {
     if (!token) return;
@@ -81,7 +106,13 @@ export default function Coupon() {
   //   }
   // }
 
-  const openModal = () => {
+  const openModal = (type, coupon) => {
+    console.log("類型", type, "優惠卷", coupon);
+    setModalType(type);
+    setModalData((pre) => ({
+      ...pre,
+      ...coupon,
+    }));
     couponModalRef.current.show();
   };
 
@@ -98,7 +129,7 @@ export default function Coupon() {
             <div className="d-flex justify-content-end">
               <button
                 onClick={() => {
-                  openModal();
+                  openModal("create", INITIAL_MODAL_DATA);
                 }}
               >
                 新增優惠卷
@@ -133,8 +164,16 @@ export default function Coupon() {
                       </td>
                       <td>{coupon.code}</td>
                       <td>
-                        <button>編輯</button>
                         <button
+                          type="button"
+                          onClick={() => {
+                            openModal("edit", coupon);
+                          }}
+                        >
+                          編輯
+                        </button>
+                        <button
+                          type="button"
                           data-id={coupon.id}
                           onClick={() => {
                             deleteCoupon(coupon.id);
@@ -155,7 +194,7 @@ export default function Coupon() {
       )}
 
       <div
-        className="modal fade"
+        className="modal fade modal-xl"
         id="couponModal"
         tabIndex="-1"
         aria-labelledby="couponModalLabel"
@@ -163,32 +202,121 @@ export default function Coupon() {
         ref={couponModalRef}
       >
         <div className="modal-dialog">
-          <div className="modal-content">
-            <div className="modal-header">
-              <h1 className="modal-title fs-5" id="couponModalLabel">
-                Modal title
-              </h1>
+          <div className="modal-content border-0">
+            <div className="modal-header bg-dark text-white">
+              <h5 id="productModalLabel" className="modal-title">
+                <span>新增優惠卷</span>
+              </h5>
               <button
                 type="button"
-                className="btn-close"
+                className="btn-close bg-white"
                 data-bs-dismiss="modal"
                 aria-label="Close"
               ></button>
             </div>
-            <div className="modal-body">...</div>
+            <div className="modal-body">
+              <div className="mb-3">
+                <label htmlFor="title" className="form-label">
+                  標題
+                </label>
+                <input
+                  name="title"
+                  id="title"
+                  type="text"
+                  className="form-control"
+                  placeholder="請輸入標題"
+                  value={modalData.title || ""}
+                  onChange={(e) => {
+                    handleModalInputChange(e);
+                  }}
+                />
+              </div>
+              <div className="mb-3 col-md-6">
+                <label htmlFor="percent" className="form-label">
+                  折扣幅度
+                </label>
+                <div className="input-group">
+                  <input
+                    name="percent"
+                    id="percent"
+                    type="number"
+                    className="form-control"
+                    placeholder="折扣幅度"
+                    value={modalData.percent || 0}
+                    onChange={(e) => {
+                      handleModalInputChange(e);
+                    }}
+                  />
+                  <span className="input-group-text">%</span>
+                </div>
+              </div>
+              <div className="mb-3 col-md-6">
+                <label htmlFor="due_date" className="form-label">
+                  到期日
+                </label>
+                <input
+                  name="due_date"
+                  id="due_date"
+                  type="date"
+                  className="form-control"
+                  value={
+                    modalData.due_date
+                      ? formatDateForInput(modalData.due_date)
+                      : 0
+                  }
+                  onChange={(e) => {
+                    const newTimestamp = Math.floor(
+                      new Date(e.target.value).getTime() / 1000,
+                    );
+                    setModalData({ ...modalData, due_date: newTimestamp });
+                  }}
+                />
+              </div>
+
+              <div className="mb-3">
+                <label htmlFor="code" className="form-label">
+                  優惠碼
+                </label>
+                <input
+                  name="code"
+                  id="code"
+                  type="text"
+                  className="form-control"
+                  placeholder="請輸入優惠碼"
+                  value={modalData.code}
+                  onChange={(e) => {
+                    handleModalInputChange(e);
+                  }}
+                />
+              </div>
+              <div className="mb-3 d-flex justify-content-end">
+                <div className="form-check">
+                  <input
+                    name="is_enabled"
+                    id="is_enabled"
+                    className="form-check-input"
+                    type="checkbox"
+                    onChange={(e) => {
+                      handleModalInputChange(e);
+                    }}
+                  />
+                  <label className="form-check-label" htmlFor="is_enabled">
+                    是否啟用
+                  </label>
+                </div>
+              </div>
+            </div>
             <div className="modal-footer">
               <button
                 type="button"
-                className="btn btn-secondary"
+                className="btn btn-outline-secondary"
                 data-bs-dismiss="modal"
-                onClick={() => {
-                  closeModal();
-                }}
+                onClick={() => closeModal()}
               >
-                Close
+                取消
               </button>
               <button type="button" className="btn btn-primary">
-                Save changes
+                確認
               </button>
             </div>
           </div>
